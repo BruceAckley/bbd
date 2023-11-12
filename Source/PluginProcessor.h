@@ -13,7 +13,7 @@
 //==============================================================================
 /**
 */
-class BbdAudioProcessor  : public juce::AudioProcessor
+class BbdAudioProcessor  : public juce::AudioProcessor, juce::AudioProcessorValueTreeState::Listener
                             #if JucePlugin_Enable_ARA
                              , public juce::AudioProcessorARAExtension
                             #endif
@@ -56,7 +56,20 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    //================Parameter Storage=============================================
+    juce::AudioProcessorValueTreeState treeState;
+
 private:
+    //================Parameter Storage=============================================
+    juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
+    void parameterChanged(const juce::String& parameterId, float newValue) override;
+
+    // TODO: Set sensible defaults
+    float mix = 1.0;
+    float regen = 1.0;
+    float delay = 1.0;
+    bool modulate = false;
+
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BbdAudioProcessor)
 };

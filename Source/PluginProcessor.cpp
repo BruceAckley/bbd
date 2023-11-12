@@ -19,13 +19,54 @@ BbdAudioProcessor::BbdAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ), treeState(*this, nullptr, "PARAMETERS", createParameterLayout())
 #endif
 {
+    treeState.addParameterListener("mix", this);
+    treeState.addParameterListener("regen", this);
+    treeState.addParameterListener("delay", this);
+    treeState.addParameterListener("modulate", this);
 }
 
 BbdAudioProcessor::~BbdAudioProcessor()
 {
+    treeState.removeParameterListener("mix", this);
+    treeState.removeParameterListener("regen", this);
+    treeState.removeParameterListener("delay", this);
+    treeState.removeParameterListener("modulate", this);
+}
+
+juce::AudioProcessorValueTreeState::ParameterLayout BbdAudioProcessor::createParameterLayout()
+{
+    std::vector <std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    // TODO: Set sensible defaults
+    params.push_back(std::move(std::make_unique<juce::AudioParameterFloat>("mix", "Mix", -24.0, 24.0, 0.0)));
+    params.push_back(std::move(std::make_unique<juce::AudioParameterFloat>("regen", "Regen", -24.0, 24.0, 0.0)));
+    params.push_back(std::move(std::make_unique<juce::AudioParameterFloat>("delay", "Delay", -24.0, 24.0, 0.0)));
+    params.push_back(std::move(std::make_unique<juce::AudioParameterBool>("modulate", "Modulate", false)));
+
+    return { params.begin(), params.end() };
+}
+
+void BbdAudioProcessor::parameterChanged(const juce::String& parameterId, float newValue)
+{
+    if (parameterId == "mix")
+    {
+        mix = newValue;
+    }
+
+    if (parameterId == "regen") {
+        regen = newValue;
+    }
+
+    if (parameterId == "delay") {
+        delay = newValue;
+    }
+
+    if (parameterId == "modulate") {
+        modulate = newValue;  // float 1 or 0 works for boolean
+    }
 }
 
 //==============================================================================
@@ -93,8 +134,11 @@ void BbdAudioProcessor::changeProgramName (int index, const juce::String& newNam
 //==============================================================================
 void BbdAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    // Reset parameters to their values in the tree state
+    mix = *treeState.getRawParameterValue("mix");
+    regen = *treeState.getRawParameterValue("regen");
+    delay = *treeState.getRawParameterValue("delay");
+    modulate = *treeState.getRawParameterValue("modulate");
 }
 
 void BbdAudioProcessor::releaseResources()
@@ -166,21 +210,34 @@ bool BbdAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* BbdAudioProcessor::createEditor()
 {
-    return new BbdAudioProcessorEditor (*this);
+    //return new BbdAudioProcessorEditor (*this);
+
+    // UI prototyping
+    return new juce::GenericAudioProcessorEditor(*this);
 }
 
 //==============================================================================
 void BbdAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    juce::MemoryOutputStream stream(destData, false);
+    treeState.state.writeToStream(stream);
 }
 
 void BbdAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
+    auto tree = juce::ValueTree::readFromData(data, size_t(sizeInBytes));
+
+    if (tree.isValid()) {
+        // Could get invalid if you have two versions of this plugin and you're making changes
+        // to one. It can do weird stuff.
+
+        treeState.state = tree;
+
+        mix = *treeState.getRawParameterValue("mix");
+        regen = *treeState.getRawParameterValue("regen");
+        delay = *treeState.getRawParameterValue("delay");
+        modulate = *treeState.getRawParameterValue("modulate");
+    }
 }
 
 //==============================================================================
